@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aerarium</title>
+<meta name="description" content="Aerarium – campagne di campionamento della banca dei campioni ambientali DAIS (Università Ca’ Foscari Venezia) e ISP-CNR, atmosfera e criosfera.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Spectral:ital,wght@0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+/* Stessa base grafica di Herbarium e Datasets Explorer (DESC) */
+:root{
+  --paper:#EEF3F4; --surface:#FAFCFC; --ink:#0A3F51; --muted:#56717B; --rule:#CBDADE;
+  --accent:#0F597B; --accent-soft:#DDEBEF; --sea:#D9E2E2; --sel:#0A3F51;
+  --a-arctic:#0F597B; --a-antarctic:#6B5B95; --a-alpine:#4F8A45; --a-urban:#C2410C; --a-other:#8A968E;
+  --k-aer:#0F597B; --k-ext:#4F8A45; --k-puf:#CFA530; --k-sed:#C2410C; --k-deg:#6B5B95; --k-snow:#A3243B; --k-other:#8A968E;
+  --ok:#4F8A45; --ask:#A97C10; --no:#B42318;
+  --desc-grad:linear-gradient(90deg,#CFA530 0%,#A5AE48 25%,#6E9A4E 50%,#1D6676 75%,#0F597B 100%);
+  --serif:"Spectral",Georgia,"Times New Roman",serif;
+  --sans:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  box-sizing:border-box;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --paper:#0B1D25; --surface:#10262F; --ink:#E1ECEF; --muted:#93AEB7; --rule:#23424D;
+    --accent:#6FB6D4; --accent-soft:#16384A; --sea:#141E1E; --sel:#FFFFFF;
+    --a-arctic:#6FB6D4; --a-antarctic:#A895D6; --a-alpine:#9CC36A; --a-urban:#FB8B5B; --a-other:#8A968E;
+    --k-aer:#6FB6D4; --k-ext:#9CC36A; --k-puf:#E3BB4A; --k-sed:#FB8B5B; --k-deg:#A895D6; --k-snow:#E0697E; --k-other:#8A968E;
+    --ok:#9CC36A; --ask:#E3BB4A; --no:#F97066;
+  }
+}
+*,*::before,*::after{box-sizing:inherit}
+html,body{height:100%;margin:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.45}
+a{color:var(--accent)}
+[hidden]{display:none!important}
+.mono{font-family:var(--mono)}
+#src{font-size:11.5px;color:var(--muted)}
+
+/* ---------- intestazione */
+.app{height:100%;display:grid;grid-template-rows:auto 1fr}
+header.top{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;padding:10px 18px 12px;border-bottom:1px solid var(--rule);background:var(--surface)}
+header.top::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:3px;background:var(--desc-grad)}
+.logo{display:block;height:52px;width:104px;object-fit:contain;overflow:hidden;background:#fff;border-radius:4px;padding:2px 4px}
+.logos{display:flex;gap:8px;flex:none}
+.logo.logo-isp{width:68px;padding:2px 3px}
+.titles{display:grid;gap:1px}
+header.top h1{margin:0;font-family:var(--sans);font-weight:700;font-size:24px;letter-spacing:.1px;line-height:1.1}
+header.top .sub{color:var(--muted);font-size:13px}
+header.top .counts{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap}
+header.top .counts b{color:var(--ink);font-weight:500}
+header.top button{white-space:nowrap;flex:none}
+.login{flex:none;font-size:12.5px;padding:5px 10px;border-radius:4px;border:1px solid var(--accent);color:var(--accent);text-decoration:none;white-space:nowrap}
+.login:hover{background:var(--accent);color:var(--surface)}
+.langbtn{font-weight:600;font-size:12px;letter-spacing:.06em;padding:5px 9px;min-width:38px}
+
+/* ---------- colonna sinistra */
+.main{display:grid;grid-template-columns:minmax(300px,390px) 1fr;min-height:0}
+aside{border-right:1px solid var(--rule);background:var(--surface);display:flex;flex-direction:column;min-height:0}
+.filters{padding:14px 16px;border-bottom:1px solid var(--rule);display:grid;gap:10px}
+.field{display:grid;gap:4px;min-width:0}
+.field label,.lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:500}
+input[type=search],input[type=number],select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--rule);border-radius:4px;padding:6px 8px;width:100%;min-width:0}
+input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.years{display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:center;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{position:relative;display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid var(--rule);border-radius:999px;padding:3px 10px 3px 7px;cursor:pointer;user-select:none;background:var(--paper);color:var(--ink)}
+.field .chip{text-transform:none;letter-spacing:0;font-weight:400}
+.chip input{position:absolute;opacity:0;pointer-events:none}
+.dot{width:9px;height:9px;border-radius:50%;flex:none;display:inline-block}
+.chip .n{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chip:has(input:not(:checked)){opacity:.45}
+.chip:has(input:not(:checked)) .dot{background:transparent!important;border:1.5px solid currentColor}
+.chip:has(input:focus-visible){outline:2px solid var(--accent)}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+button{font:inherit;font-size:12.5px;color:var(--ink);background:var(--paper);border:1px solid var(--rule);border-radius:4px;padding:5px 10px;cursor:pointer}
+button:hover{border-color:var(--accent);color:var(--accent)}
+
+.panel{overflow:auto;padding:14px 16px 24px;display:grid;gap:14px;align-content:start;min-height:0}
+.panel h2{margin:0;font-family:var(--serif);font-weight:600;font-size:19px;text-wrap:balance}
+.panel h3,.dsec h3{margin:0 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:500}
+.note{font-size:12.5px;color:var(--muted)}
+.back{justify-self:start}
+.camps{display:grid}
+.cp{display:grid;gap:2px;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--rule);border-radius:0;padding:8px 4px;cursor:pointer;color:var(--ink)}
+.cp:hover{background:var(--accent-soft);color:var(--ink)}
+.cp[aria-current="true"]{background:var(--accent-soft)}
+.cp .nm{font-family:var(--serif);font-weight:500;font-size:15.5px;line-height:1.3}
+.cp .mt{display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px;font-size:12px;color:var(--muted)}
+.ar{display:inline-flex;align-items:center;gap:5px;color:var(--ink)}
+.av{display:inline-flex;align-items:center;font-size:11px;border:1px solid currentColor;border-radius:3px;padding:0 5px}
+.av.ok{color:var(--ok)}.av.ask{color:var(--ask)}.av.no{color:var(--no)}
+.empty{color:var(--muted);font-size:13px;padding:8px 0}
+
+/* ---------- mappa */
+.mapwrap{position:relative;min-height:0}
+#map{position:absolute;inset:0;background:var(--sea)}
+.leaflet-container{font-family:var(--sans);background:var(--sea)}
+.legend{position:absolute;right:12px;bottom:14px;z-index:500;background:var(--surface);border:1px solid var(--rule);border-radius:4px;padding:8px 10px;font-size:12px;display:grid;gap:4px;max-width:230px}
+.legend .i{display:flex;align-items:center;gap:7px}
+.legend .s{color:var(--muted);font-size:11px;margin-top:2px}
+.mapbtns{position:absolute;right:12px;top:12px;z-index:500;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}
+.mapbtns button{background:var(--surface)}
+.leaflet-tooltip.tt{background:var(--surface);color:var(--ink);border:1px solid var(--rule);box-shadow:none;font-size:12px;border-radius:3px}
+.leaflet-tooltip.tt::before{display:none}
+.leaflet-control-zoom a{background:var(--surface)!important;color:var(--ink)!important;border-color:var(--rule)!important}
+.leaflet-control-attribution{background:color-mix(in srgb,var(--surface) 85%,transparent)!important;color:var(--muted)!important;font-size:11px!important}
+.leaflet-control-attribution a{color:var(--accent)!important}
+
+/* ---------- scheda della campagna */
+.scrim{position:fixed;inset:0;background:rgba(6,30,40,.35);z-index:1040;opacity:0;pointer-events:none;transition:opacity .2s}
+.scrim.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(560px,100%);background:var(--surface);z-index:1050;display:grid;grid-template-rows:auto 1fr;border-left:1px solid var(--rule);box-shadow:-10px 0 30px rgba(6,30,40,.16);transform:translateX(102%);visibility:hidden;transition:transform .22s ease,visibility 0s .22s}
+.drawer.on{transform:none;visibility:visible;transition:transform .22s ease}
+.dbar{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--rule)}
+.dbar .pos{font-family:var(--mono);font-size:12px;color:var(--muted);margin-right:auto}
+.dbar button{min-width:32px;font-size:15px;line-height:1;padding:5px 8px}
+.dbody{overflow:auto;padding:16px 20px 32px;display:grid;gap:16px;align-content:start}
+.dbody h2{margin:6px 0 0;font-family:var(--serif);font-weight:600;font-size:21px;line-height:1.25;text-wrap:balance}
+.dkick{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;font-size:12.5px;color:var(--muted)}
+.box{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--rule);border-radius:3px;padding:0 5px;white-space:nowrap}
+.dact{display:flex;flex-wrap:wrap;gap:8px}
+.dact a.primary{display:inline-flex;align-items:center;font-size:12.5px;padding:5px 10px;border-radius:4px;background:var(--accent);color:var(--surface);border:1px solid var(--accent);text-decoration:none;font-weight:500}
+.dact a.primary:hover{filter:brightness(1.1)}
+.desc{font-family:var(--serif);font-size:15px;line-height:1.6;max-width:70ch;margin:0}
+dl.label{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:0;padding:9px 11px;font-size:12.5px;background:var(--paper);border:1px solid var(--rule);border-radius:3px}
+dl.label dt{color:var(--muted)}
+dl.label dd{margin:0;overflow-wrap:anywhere}
+.bars{display:grid;gap:4px}
+.bar{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:8px;align-items:center;font-size:12.5px}
+.bar .t{position:relative;padding:3px 6px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.bar .t span{position:relative}
+.bar .t::before{content:"";position:absolute;inset:0 auto 0 0;width:var(--w);background:var(--accent-soft);border-left:3px solid var(--k,var(--k-ext));border-radius:2px}
+.bar .n{font-family:var(--mono);font-size:12px;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+.linkbtn{background:none;border:0;padding:0;color:var(--accent);text-decoration:underline;font-size:inherit;cursor:pointer;text-align:left}
+
+.fatal{position:fixed;left:12px;right:12px;top:12px;z-index:3000;background:#B42318;color:#fff;padding:10px 14px;border-radius:5px;font-size:13px}
+@media (max-width:760px){
+  .logo{height:40px;width:80px}
+  .logo.logo-isp{width:52px}
+  .logos{gap:6px}
+  .app{height:auto}
+  .main{grid-template-columns:minmax(0,1fr)}
+  .mapwrap{order:-1;height:58vh;min-height:320px;border-bottom:1px solid var(--rule)}
+  aside{border-right:0}
+  .panel{overflow:visible}
+  header.top .counts{margin-left:0}
+  .legend{bottom:10px;right:10px}
+  .dbody{padding:14px 16px 32px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="logos">
+      <img class="logo" src="https://www.unive.it/web/fileadmin/user_upload/img/loghi/logoDESC.png" width="104" height="52" onerror="this.hidden=true" alt="DESC">
+      <img class="logo logo-isp" src="data:image/png;base64,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" width="68" height="52" alt="ISP – Istituto di Scienze Polari, CNR">
+    </div>
+    <div class="titles"><h1>Aerarium</h1>
+    <span class="sub" data-i18n="subtitle">Banca dei campioni ambientali DAIS e ISP-CNR – atmosfera e criosfera</span></div>
+    <div class="counts" id="counts"></div>
+    <a class="login" id="loginBtn" href="#" hidden data-i18n="login">Accesso riservato</a>
+    <button type="button" class="langbtn" id="langBtn">EN</button>
+  </header>
+  <div class="main">
+    <aside>
+      <form class="filters" id="filters" autocomplete="off">
+        <div class="field">
+          <label for="q" data-i18n="search">Cerca</label>
+          <input type="search" id="q" spellcheck="false" data-i18n-ph="searchPh" placeholder="Campagna, sito, tipo di campione…">
+        </div>
+        <div class="field"><span class="lbl" data-i18n="area">Area</span><div class="chips" id="fArea"></div></div>
+        <div class="row2">
+          <div class="field"><label for="fCat" data-i18n="category">Categoria</label><select id="fCat"></select></div>
+          <div class="field"><span class="lbl" data-i18n="period">Periodo</span>
+            <div class="years"><input type="number" id="y0" data-i18n-aria="from" aria-label="Dal" inputmode="numeric"><span>–</span><input type="number" id="y1" data-i18n-aria="to" aria-label="Al" inputmode="numeric"></div></div>
+        </div>
+        <div class="field"><span class="lbl" data-i18n="avail">Disponibilità per uso esterno</span><div class="chips" id="fAvail"></div></div>
+        <div class="actions"><button type="button" id="reset" data-i18n="reset">Azzera filtri</button></div>
+        <div id="src"></div>
+      </form>
+      <div class="panel" id="panel"><p class="empty" data-i18n="loading">Caricamento dei dati…</p></div>
+    </aside>
+    <div class="mapwrap">
+      <div id="map" role="region" data-i18n-aria="mapAria" aria-label="Mappa dei siti di campionamento"></div>
+      <div class="mapbtns"><button type="button" id="fitAll" data-i18n="fitAll">Tutti i siti</button></div>
+      <div class="legend" id="legend"></div>
+    </div>
+  </div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<section class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="dTitle" aria-hidden="true">
+  <div class="dbar">
+    <span class="pos" id="dPos"></span>
+    <button type="button" id="dPrev" aria-label="Precedente">‹</button>
+    <button type="button" id="dNext" aria-label="Successivo">›</button>
+    <button type="button" id="dClose" aria-label="Chiudi">×</button>
+  </div>
+  <div class="dbody" id="dBody"></div>
+</section>
+<div id="fatal" class="fatal" role="alert" hidden></div>
+
+<script async src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js" onload="window.__leafletReady && window.__leafletReady()" onerror="window.__leafletFailed && window.__leafletFailed()"></script>
+<script>
+/* =====================================================================
+   CONFIGURAZIONE
+   ===================================================================== */
+// URL dell'App web dello script PUBBLICO (Public.gs), non quello del gestionale. Termina con /exec
+const API_URL = 'https://script.google.com/macros/s/AKfycbxMTK3DkjNYhuDZimEVcxHoImeUp4hkVpnvcMlK9l0/dev';
+// URL del gestionale (App web del progetto Code.gs + App.html), aperto dal pulsante "Accesso riservato".
+// Vuoto = pulsante nascosto.
+const ADMIN_URL = 'https://script.google.com/a/macros/unive.it/s/AKfycbxCF8xbRjVLlAWtkKdlFKaocL8uVC0uCx4ks_zkt4PY4XAWztKvWrQkDajaZQUEEpLF/exec';
+
+const AREA_COLORS = { 'artico':'--a-arctic', 'antartide':'--a-antarctic', 'alpino':'--a-alpine', 'urbano':'--a-urban' };
+const CAT_COLORS = { 'aerosol':'--k-aer', 'estratto acquoso':'--k-ext', 'puf':'--k-puf', 'sedimento':'--k-sed', 'degradazione artificiale':'--k-deg', 'neve':'--k-snow' };
+
+/* =====================================================================
+   TESTI
+   ===================================================================== */
+const I18N = {
+  it:{ locale:'it-IT', subtitle:'Banca dei campioni ambientali DAIS e ISP-CNR \u2013 atmosfera e criosfera',
+    search:'Cerca', searchPh:'Campagna, sito, tipo di campione\u2026', area:'Area', category:'Categoria', period:'Periodo', from:'Dal', to:'Al',
+    login:'Accesso riservato', avail:'Disponibilit\u00E0 per uso esterno', reset:'Azzera filtri', loading:'Caricamento dei dati\u2026', all_f:'Tutte',
+    mapAria:'Mappa dei siti di campionamento', fitAll:'Tutti i siti',
+    campaigns:'campagne', campaign1:'campagna', samples:'campioni', sites:'siti',
+    campList:'Campagne', noPos:'Campagne senza posizione sulla mappa', allSites:'\u2190 Tutte le campagne',
+    noMatch:'Nessuna campagna corrisponde ai filtri. Prova ad allargare il periodo o ad azzerare i filtri.',
+    lgSize:'Area del cerchio \u221D numero di campioni', unknownArea:'Altra area',
+    availNames:{ ok:'Disponibile', ask:'Su richiesta', no:'Non disponibile', none:'Da definire' },
+    nSamples:(n,u)=>`${n} campioni conservati`+(u!==n?` \u00B7 ${u} utilizzabili`:''),
+    composition:'Composizione', types:'Tipi di campione', fractions:'Frazioni granulometriche', where:'Siti di campionamento',
+    contact:'Referente', contacts:'Referenti', noContact:'Referente da definire', noMail:'email non indicata', write:'Scrivi al referente', writeAll:'Scrivi ai referenti', moreInfo:'Approfondisci',
+    reqSubject:n=>`Aerarium \u2013 richiesta di informazioni sulla campagna \u201C${n}\u201D`,
+    ids:'Identificativi', campId:'ID campagna', yearsLbl:'Periodo', pos:(i,n)=>`${i} / ${n}`, close:'Chiudi', prev:'Precedente', next:'Successivo',
+    readAt:'Dati aggiornati il', fail:'Dati non disponibili in questo momento. Riprova pi\u00F9 tardi.', notConfigured:'Indirizzo API non configurato: imposta API_URL in index.html.',
+    leaflet:'La libreria della mappa (Leaflet) non si \u00E8 caricata: controlla la connessione.' },
+  en:{ locale:'en-GB', subtitle:'DAIS and ISP-CNR environmental sample bank \u2013 atmosphere and cryosphere',
+    search:'Search', searchPh:'Campaign, site, sample type\u2026', area:'Area', category:'Category', period:'Period', from:'From', to:'To',
+    login:'Staff login', avail:'Availability for external use', reset:'Clear filters', loading:'Loading data\u2026', all_f:'All',
+    mapAria:'Map of sampling sites', fitAll:'All sites',
+    campaigns:'campaigns', campaign1:'campaign', samples:'samples', sites:'sites',
+    campList:'Campaigns', noPos:'Campaigns not shown on the map', allSites:'\u2190 All campaigns',
+    noMatch:'No campaign matches the filters. Try widening the period or clearing the filters.',
+    lgSize:'Circle area \u221D number of samples', unknownArea:'Other area',
+    availNames:{ ok:'Available', ask:'On request', no:'Not available', none:'To be defined' },
+    nSamples:(n,u)=>`${n} samples in storage`+(u!==n?` \u00B7 ${u} usable`:''),
+    composition:'Composition', types:'Sample types', fractions:'Size fractions', where:'Sampling sites',
+    contact:'Contact point', contacts:'Contact points', noContact:'Contact point to be defined', noMail:'email not given', write:'Write to the contact point', writeAll:'Write to the contact points', moreInfo:'More information',
+    reqSubject:n=>`Aerarium \u2013 information request on the campaign \u201C${n}\u201D`,
+    ids:'Identifiers', campId:'Campaign ID', yearsLbl:'Period', pos:(i,n)=>`${i} / ${n}`, close:'Close', prev:'Previous', next:'Next',
+    readAt:'Data updated on', fail:'Data not available right now. Please try again later.', notConfigured:'API address not configured: set API_URL in index.html.',
+    leaflet:'The map library (Leaflet) did not load: check your connection.' }
+};
+// Nomi delle aree e delle categorie come scritti nel foglio \u2192 inglese
+const EN_TERMS = { 'Artico':'Arctic', 'Antartide':'Antarctica', 'Alpino':'Alpine', 'Urbano':'Urban', 'Laboratorio':'Laboratory',
+  'Aerosol':'Aerosol', 'Estratto acquoso':'Aqueous extract', 'PUF':'PUF', 'Sedimento':'Sediment', 'Degradazione artificiale':'Artificial degradation', 'Neve':'Snow' };
+let LANG = 'it';
+try { const s = localStorage.getItem('aerarium.lang'); LANG = s === 'en' || s === 'it' ? s : (/^it/i.test(navigator.language || 'it') ? 'it' : 'en'); } catch(e) {}
+const T = (k, ...a) => { const v = I18N[LANG][k] !== undefined ? I18N[LANG][k] : I18N.it[k]; return typeof v === 'function' ? v(...a) : v; };
+const tr = s => LANG === 'en' && EN_TERMS[s] ? EN_TERMS[s] : s;
+
+/* =====================================================================
+   STATO E UTILIT\u00C0
+   ===================================================================== */
+let DATA = null, CAMPS = [], BY_ID = {}, SITES = {}, AREAS = [], CATS = [], YMIN = 0, YMAX = 0, RESULTS = [];
+const S = { q:'', areaOff:new Set(), cat:'', availOff:new Set(), y0:null, y1:null, site:null, open:null };
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+const fmt = n => Number(n).toLocaleString(T('locale'));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const areaVar = a => `var(${AREA_COLORS[norm(a)] || '--a-other'})`;
+const areaCss = a => css(AREA_COLORS[norm(a)] || '--a-other');
+const catVar = c => `var(${CAT_COLORS[norm(c)] || '--k-other'})`;
+const availKey = a => { a = norm(a); return a.startsWith('disponib') ? 'ok' : a.startsWith('su richiesta') ? 'ask' : a.startsWith('non') ? 'no' : 'none'; };
+const availHtml = c => `<span class="av ${availKey(c.avail)}">${esc(T('availNames')[availKey(c.avail)])}</span>`;
+const period = c => c.y0 ? (c.y1 && c.y1 !== c.y0 ? `${c.y0}\u2013${c.y1}` : String(c.y0)) : '';
+const safeMail = e => /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(e || '') ? e : '';
+
+/* =====================================================================
+   CARICAMENTO
+   ===================================================================== */
+async function load(){
+  if (window.AERARIUM_PUBLIC_DATA) { init(window.AERARIUM_PUBLIC_DATA); return; }
+  if (!API_URL) { $('panel').innerHTML = `<p class="empty">${esc(T('notConfigured'))}</p>`; return; }
+  const ctrl = new AbortController(), t = setTimeout(() => ctrl.abort(), 30000);
+  try {
+    const res = await fetch(API_URL + '?action=getPublic', { signal: ctrl.signal });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const d = await res.json();
+    if (!d || d.error) throw new Error(d && d.error);
+    init(d);
+  } catch (e) { $('panel').innerHTML = `<p class="empty">${esc(T('fail'))}</p>`; }
+  finally { clearTimeout(t); }
+}
+function init(d){
+  DATA = d;
+  SITES = Object.fromEntries((d.sites || []).map(s => [s.id, s]));
+  CAMPS = (d.campaigns || []).map(c => {
+    c.sites = (c.sites || []).filter(id => SITES[id]);
+    c.cats = c.cats || {}; c.types = c.types || {}; c.fracs = c.fracs || [];
+    c._h = ' ' + norm([c.id, c.name, c.desc, c.area, tr(c.area), c.sites.map(id => SITES[id].name).join(' '), Object.keys(c.cats).map(k => k + ' ' + tr(k)).join(' '), Object.keys(c.types).join(' '), c.fracs.join(' ')].join(' '));
+    return c;
+  }).sort((a, b) => (b.y1 || 0) - (a.y1 || 0) || a.name.localeCompare(b.name));
+  BY_ID = Object.fromEntries(CAMPS.map(c => [c.id, c]));
+  const ac = {}, cc = {}; CAMPS.forEach(c => { ac[c.area || ''] = (ac[c.area || ''] || 0) + 1; Object.keys(c.cats).forEach(k => cc[k] = (cc[k] || 0) + c.cats[k]); });
+  AREAS = Object.keys(ac).sort((a, b) => ac[b] - ac[a]);
+  CATS = Object.keys(cc).sort((a, b) => cc[b] - cc[a]);
+  const ys = CAMPS.flatMap(c => c.y0 ? [c.y0, c.y1 || c.y0] : []);
+  YMIN = ys.length ? Math.min(...ys) : 2000; YMAX = ys.length ? Math.max(...ys) : YMIN;
+  ['y0','y1'].forEach(id => { $(id).min = YMIN; $(id).max = YMAX; }); $('y0').placeholder = YMIN; $('y1').placeholder = YMAX;
+  readHash();
+  render(true);
+  if (S.open && BY_ID[S.open]) openCamp(S.open, true);
+}
+
+/* =====================================================================
+   FILTRI
+   ===================================================================== */
+function passes(c, skip){
+  const q = norm(S.q).split(/\s+/).filter(Boolean);
+  if (q.length && !q.every(t => c._h.includes(t))) return false;
+  if (skip !== 'area' && S.areaOff.has(c.area || '')) return false;
+  if (skip !== 'cat' && S.cat && !c.cats[S.cat]) return false;
+  if (skip !== 'avail' && S.availOff.has(availKey(c.avail))) return false;
+  if (skip !== 'year' && S.y0 != null && !(c.y0 && c.y0 <= S.y1 && (c.y1 || c.y0) >= S.y0)) return false;
+  return true;
+}
+const filtersOn = () => !!(S.q || S.areaOff.size || S.cat || S.availOff.size || S.y0 != null);
+
+/* =====================================================================
+   RENDER
+   ===================================================================== */
+function render(fit){
+  RESULTS = CAMPS.filter(c => passes(c));
+  renderCounts(); renderFilters(); drawMap(fit); renderPanel(); writeHash();
+}
+function renderCounts(){
+  const t = DATA.totals || {};
+  $('counts').innerHTML = `<span><b>${fmt(t.campaigns || CAMPS.length)}</b> ${T('campaigns')}</span><span><b>${fmt(t.samples || 0)}</b> ${T('samples')}</span><span><b>${fmt(t.sites || 0)}</b> ${T('sites')}</span>`;
+  $('src').textContent = DATA.updated ? T('readAt') + ' ' + new Date(DATA.updated).toLocaleString(T('locale'), { day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+}
+function renderFilters(){
+  const ac = {}; CAMPS.forEach(c => { if (passes(c, 'area')) ac[c.area || ''] = (ac[c.area || ''] || 0) + 1; });
+  $('fArea').innerHTML = AREAS.map(a => `<label class="chip"><input type="checkbox" data-area="${esc(a)}" ${S.areaOff.has(a) ? '' : 'checked'}><span class="dot" style="background:${areaVar(a)}"></span><span>${esc(a ? tr(a) : T('unknownArea'))}</span><span class="n">${ac[a] || 0}</span></label>`).join('');
+  const vc = {}; CAMPS.forEach(c => { if (passes(c, 'avail')) vc[availKey(c.avail)] = (vc[availKey(c.avail)] || 0) + 1; });
+  const keys = ['ok', 'ask', 'no', 'none'].filter(k => CAMPS.some(c => availKey(c.avail) === k));
+  $('fAvail').innerHTML = keys.map(k => `<label class="chip"><input type="checkbox" data-avail="${k}" ${S.availOff.has(k) ? '' : 'checked'}><span class="dot" style="background:var(--${k === 'none' ? 'a-other' : k})"></span><span>${esc(T('availNames')[k])}</span><span class="n">${vc[k] || 0}</span></label>`).join('');
+  const cc = {}; CAMPS.forEach(c => { if (passes(c, 'cat')) Object.keys(c.cats).forEach(k => cc[k] = (cc[k] || 0) + 1); });
+  $('fCat').innerHTML = `<option value="">${esc(T('all_f'))}</option>` + CATS.map(k => `<option value="${esc(k)}">${esc(tr(k))} (${cc[k] || 0})</option>`).join('');
+  $('fCat').value = S.cat;
+  $('y0').value = S.y0 != null ? S.y0 : ''; $('y1').value = S.y1 != null ? S.y1 : '';
+}
+function campRow(c){
+  return `<button type="button" class="cp" data-open="${esc(c.id)}"${S.open === c.id ? ' aria-current="true"' : ''}>
+    <span class="nm">${esc(c.name)}</span>
+    <span class="mt"><span class="ar"><span class="dot" style="background:${areaVar(c.area)}"></span>${esc(c.area ? tr(c.area) : T('unknownArea'))}</span>${period(c) ? `<span class="mono">${esc(period(c))}</span>` : ''}<span>${fmt(c.n)} ${T('samples')}</span>${availHtml(c)}</span>
+  </button>`;
+}
+function renderPanel(){
+  const p = $('panel');
+  if (S.site && SITES[S.site]) {
+    const s = SITES[S.site], here = RESULTS.filter(c => c.sites.includes(S.site));
+    p.innerHTML = `<button type="button" class="back" id="back">${esc(T('allSites'))}</button>
+      <div><h2>${esc(s.name)}</h2><p class="note" style="margin:6px 0 0">${esc(tr(s.area) || '')}${s.area ? ' \u00B7 ' : ''}<span class="mono">${coord(s)}</span></p></div>
+      <div><h3>${esc(T('campList'))} (${here.length})</h3><div class="camps">${here.map(campRow).join('') || `<p class="empty">${esc(T('noMatch'))}</p>`}</div></div>`;
+    $('back').onclick = () => { S.site = null; render(false); };
+    return;
+  }
+  if (!RESULTS.length) { p.innerHTML = `<p class="empty">${esc(T('noMatch'))}</p>`; return; }
+  const onMap = RESULTS.filter(c => c.sites.length), off = RESULTS.filter(c => !c.sites.length);
+  p.innerHTML = `<div><h3>${esc(T('campList'))} (${onMap.length})</h3><div class="camps">${onMap.map(campRow).join('')}</div></div>` +
+    (off.length ? `<div><h3>${esc(T('noPos'))} (${off.length})</h3><div class="camps">${off.map(campRow).join('')}</div></div>` : '');
+}
+const coord = s => `${Math.abs(s.lat).toFixed(3)}\u00B0 ${s.lat >= 0 ? 'N' : 'S'}, ${Math.abs(s.lon).toFixed(3)}\u00B0 ${s.lon >= 0 ? 'E' : 'W'}`;
+
+/* =====================================================================
+   MAPPA (un solo sfondo, come richiesto)
+   ===================================================================== */
+let map = null, layer = null;
+function setupMap(){
+  if (!window.L) return;
+  map = L.map('map', { minZoom: 2, maxZoom: 18, worldCopyJump: true, preferCanvas: true });
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>' }).addTo(map);
+  map.attributionControl.setPrefix(false);
+  map.setView([30, 10], 2);
+  layer = L.layerGroup().addTo(map);
+}
+function siteGroups(){
+  const g = new Map();
+  RESULTS.forEach(c => c.sites.forEach(id => { let e = g.get(id); if (!e) { e = { site: SITES[id], camps: [], n: 0 }; g.set(id, e); } e.camps.push(c); e.n += c.n; }));
+  return [...g.values()].sort((a, b) => b.n - a.n);
+}
+function drawMap(fit){
+  renderLegend();
+  if (!map) return;
+  layer.clearLayers();
+  const groups = siteGroups();
+  groups.forEach(e => {
+    const areas = {}; e.camps.forEach(c => areas[c.area] = (areas[c.area] || 0) + c.n);
+    const area = e.site.area || Object.keys(areas).sort((a, b) => areas[b] - areas[a])[0];
+    const sel = S.site === e.site.id;
+    const m = L.circleMarker([e.site.lat, e.site.lon], { radius: 5 + Math.sqrt(e.n) * 2.2, color: sel ? css('--sel') : areaCss(area), weight: sel ? 3 : 1.5,
+      fillColor: areaCss(area), fillOpacity: sel ? .8 : .5, bubblingMouseEvents: false });
+    m.bindTooltip(`<b>${esc(e.site.name)}</b><br>${e.camps.length} ${e.camps.length === 1 ? T('campaign1') : T('campaigns')} \u00B7 ${fmt(e.n)} ${T('samples')}`, { className: 'tt', direction: 'top', offset: [0, -4] });
+    m.on('click', () => selectSite(e.site.id));
+    m.addTo(layer);
+  });
+  if (fit) fitAll(groups);
+}
+function fitAll(groups){
+  groups = groups || siteGroups();
+  if (!map || !groups.length) return;
+  map.fitBounds(L.latLngBounds(groups.map(e => [e.site.lat, e.site.lon])).pad(.15), { maxZoom: 6 });
+}
+function selectSite(id){
+  S.site = id;
+  const here = RESULTS.filter(c => c.sites.includes(id));
+  render(false);
+  if (map) map.flyTo([SITES[id].lat, SITES[id].lon], Math.max(map.getZoom(), 5), { duration: .6 });
+  if (here.length === 1) openCamp(here[0].id);
+  $('panel').scrollTop = 0;
+}
+function renderLegend(){
+  const used = [...new Set(RESULTS.filter(c => c.sites.length).map(c => c.area || ''))];
+  $('legend').innerHTML = used.map(a => `<div class="i"><span class="dot" style="background:${areaVar(a)}"></span>${esc(a ? tr(a) : T('unknownArea'))}</div>`).join('') + `<div class="s">${esc(T('lgSize'))}</div>`;
+  $('legend').hidden = !used.length;
+}
+
+/* =====================================================================
+   SCHEDA DELLA CAMPAGNA
+   ===================================================================== */
+let lastFocus = null;
+function bars(obj, colored){
+  const items = Object.entries(obj).sort((a, b) => b[1] - a[1]);
+  if (!items.length) return '';
+  const max = items[0][1];
+  return `<div class="bars">${items.map(([k, n]) => `<div class="bar"><span class="t" style="--w:${(n / max * 100).toFixed(1)}%${colored ? ';--k:' + catVar(k) : ''}"><span>${esc(colored ? tr(k) : k)}</span></span><span class="n">${fmt(n)}</span></div>`).join('')}</div>`;
+}
+function openCamp(id, silent){
+  const c = BY_ID[id]; if (!c) return;
+  if (!$('drawer').classList.contains('on')) lastFocus = document.activeElement;
+  S.open = id;
+  const i = RESULTS.indexOf(c);
+  $('dPos').textContent = i >= 0 ? T('pos', i + 1, RESULTS.length) : '';
+  $('dPrev').disabled = i <= 0; $('dNext').disabled = i < 0 || i >= RESULTS.length - 1;
+  // Referenti dei campioni della campagna, con email (mai i creatori: l'API non li fornisce)
+  const people = (c.contacts || []).filter(p => p && (p.name || p.email));
+  const mails = [...new Set(people.map(p => safeMail(p.email)).filter(Boolean))];
+  const href = mails.length ? `mailto:${mails.join(',')}?subject=${encodeURIComponent(T('reqSubject', c.name))}` : '';
+  const link = /^https?:\/\//.test(c.link || '') ? c.link : '';
+  $('dBody').innerHTML = `
+    <div>
+      <div class="dkick"><span class="ar"><span class="dot" style="background:${areaVar(c.area)}"></span>${esc(c.area ? tr(c.area) : T('unknownArea'))}</span>${period(c) ? `<span class="box">${esc(period(c))}</span>` : ''}${availHtml(c)}</div>
+      <h2 id="dTitle">${esc(c.name)}</h2>
+      <p class="note" style="margin:6px 0 0">${esc(T('nSamples', c.n, c.nUsable))}</p>
+    </div>
+    ${href || link ? `<div class="dact">${href ? `<a class="primary" href="${esc(href)}">${esc(T(mails.length > 1 ? 'writeAll' : 'write'))}</a>` : ''}${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">${esc(T('moreInfo'))}</a>` : ''}</div>` : ''}
+    ${c.desc ? `<p class="desc">${esc(c.desc)}</p>` : ''}
+    <div class="dsec"><h3>${esc(people.length > 1 ? T('contacts') : T('contact'))}</h3><dl class="label">
+      ${people.length ? people.map(p => { const m = safeMail(p.email); return `<dt>${esc(p.name || T('contact'))}</dt><dd>${m ? `<a href="mailto:${esc(m)}?subject=${encodeURIComponent(T('reqSubject', c.name))}">${esc(m)}</a>` : esc(T('noMail'))}</dd>`; }).join('') : `<dt>${esc(T('contact'))}</dt><dd>${esc(T('noContact'))}</dd>`}
+      <dt>${esc(T('avail'))}</dt><dd>${esc(T('availNames')[availKey(c.avail)])}</dd>
+    </dl></div>
+    ${Object.keys(c.cats).length ? `<div class="dsec"><h3>${esc(T('composition'))}</h3>${bars(c.cats, true)}</div>` : ''}
+    ${Object.keys(c.types).length ? `<div class="dsec"><h3>${esc(T('types'))}</h3>${bars(c.types, false)}</div>` : ''}
+    ${c.fracs.length ? `<div class="dsec"><h3>${esc(T('fractions'))}</h3><p class="note" style="margin:0">${esc(c.fracs.join(' \u00B7 '))}</p></div>` : ''}
+    ${c.sites.length ? `<div class="dsec"><h3>${esc(T('where'))}</h3><dl class="label">${c.sites.map(id => `<dt><button type="button" class="linkbtn" data-site="${esc(id)}">${esc(SITES[id].name)}</button></dt><dd class="mono">${coord(SITES[id])}</dd>`).join('')}</dl></div>` : ''}
+    <div class="dsec"><h3>${esc(T('ids'))}</h3><dl class="label"><dt>${esc(T('campId'))}</dt><dd class="mono">${esc(c.id)}</dd>${period(c) ? `<dt>${esc(T('yearsLbl'))}</dt><dd>${esc(period(c))}</dd>` : ''}</dl></div>`;
+  $('drawer').classList.add('on'); $('drawer').setAttribute('aria-hidden', 'false'); $('scrim').classList.add('on');
+  $('dBody').scrollTop = 0;
+  document.querySelectorAll('.cp[aria-current]').forEach(el => el.removeAttribute('aria-current'));
+  document.querySelectorAll(`.cp[data-open="${CSS.escape(id)}"]`).forEach(el => el.setAttribute('aria-current', 'true'));
+  if (!silent) $('dClose').focus();
+  writeHash();
+}
+function closeCamp(){
+  if (!$('drawer').classList.contains('on')) return;
+  $('drawer').classList.remove('on'); $('drawer').setAttribute('aria-hidden', 'true'); $('scrim').classList.remove('on');
+  document.querySelectorAll('.cp[aria-current]').forEach(el => el.removeAttribute('aria-current'));
+  S.open = null; writeHash();
+  if (lastFocus && document.contains(lastFocus)) lastFocus.focus();
+}
+function step(d){ const i = RESULTS.indexOf(BY_ID[S.open]) + d; if (i >= 0 && i < RESULTS.length) openCamp(RESULTS[i].id, true); }
+
+/* =====================================================================
+   LINK CONDIVISIBILE (#c=CP14&s=S09)
+   ===================================================================== */
+function writeHash(){
+  const p = new URLSearchParams();
+  if (S.open) p.set('c', S.open);
+  if (S.site) p.set('s', S.site);
+  const h = p.toString();
+  try { history.replaceState(null, '', h ? '#' + h : location.pathname + location.search); } catch(e) {}
+}
+function readHash(){
+  const p = new URLSearchParams(location.hash.slice(1));
+  S.open = p.get('c'); S.site = SITES[p.get('s')] ? p.get('s') : null;
+}
+
+/* =====================================================================
+   LINGUA ED EVENTI
+   ===================================================================== */
+function applyLang(){
+  document.documentElement.lang = LANG;
+  document.querySelectorAll('[data-i18n]').forEach(el => { const v = T(el.dataset.i18n); if (typeof v === 'string') el.textContent = v; });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => el.placeholder = T(el.dataset.i18nPh));
+  document.querySelectorAll('[data-i18n-aria]').forEach(el => el.setAttribute('aria-label', T(el.dataset.i18nAria)));
+  $('dClose').setAttribute('aria-label', T('close')); $('dPrev').setAttribute('aria-label', T('prev')); $('dNext').setAttribute('aria-label', T('next'));
+  $('langBtn').textContent = LANG === 'it' ? 'EN' : 'IT';
+}
+function refresh(){ S.site = S.site && RESULTS.some(c => c.sites.includes(S.site)) ? S.site : null; render(false); if (S.open && BY_ID[S.open]) openCamp(S.open, true); }
+let qT;
+$('filters').addEventListener('submit', e => e.preventDefault());
+$('q').addEventListener('input', e => { clearTimeout(qT); qT = setTimeout(() => { S.q = e.target.value.trim(); S.site = null; render(false); }, 160); });
+$('fCat').addEventListener('change', e => { S.cat = e.target.value; refresh(); });
+$('fArea').addEventListener('change', e => { const a = e.target.dataset.area; if (a == null) return; e.target.checked ? S.areaOff.delete(a) : S.areaOff.add(a); refresh(); });
+$('fAvail').addEventListener('change', e => { const a = e.target.dataset.avail; if (!a) return; e.target.checked ? S.availOff.delete(a) : S.availOff.add(a); refresh(); });
+const years = () => {
+  let a = parseInt($('y0').value, 10), b = parseInt($('y1').value, 10);
+  if (isNaN(a) && isNaN(b)) S.y0 = S.y1 = null;
+  else { a = isNaN(a) ? YMIN : a; b = isNaN(b) ? YMAX : b; S.y0 = Math.min(a, b); S.y1 = Math.max(a, b); }
+  refresh();
+};
+$('y0').addEventListener('change', years); $('y1').addEventListener('change', years);
+$('reset').onclick = () => { S.q = ''; $('q').value = ''; S.areaOff.clear(); S.availOff.clear(); S.cat = ''; S.y0 = S.y1 = null; S.site = null; render(true); };
+$('fitAll').onclick = () => { S.site = null; render(true); };
+$('dClose').onclick = closeCamp; $('scrim').onclick = closeCamp;
+$('dPrev').onclick = () => step(-1); $('dNext').onclick = () => step(1);
+$('langBtn').onclick = () => { LANG = LANG === 'it' ? 'en' : 'it'; try { localStorage.setItem('aerarium.lang', LANG); } catch(e) {} applyLang(); if (DATA) { init(DATA); } };
+document.addEventListener('click', e => {
+  const o = e.target.closest('[data-open]'); if (o) { openCamp(o.dataset.open); return; }
+  const s = e.target.closest('[data-site]'); if (s) { closeCamp(); selectSite(s.dataset.site); }
+});
+document.addEventListener('keydown', e => {
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+  if (e.key === 'Escape') closeCamp();
+  else if (e.key === '/' && !typing) { e.preventDefault(); $('q').focus(); }
+  else if (S.open && !typing && e.key === 'ArrowRight') step(1);
+  else if (S.open && !typing && e.key === 'ArrowLeft') step(-1);
+});
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => DATA && drawMap(false));
+
+if (/^https:\/\//.test(ADMIN_URL)) { $('loginBtn').href = ADMIN_URL; $('loginBtn').hidden = false; }
+applyLang();
+// la libreria della mappa arriva in parallelo: i dati e l'elenco non la aspettano
+window.__leafletReady = () => { if (map) return; setupMap(); if (DATA) drawMap(true); };
+window.__leafletFailed = () => { $('fatal').hidden = false; $('fatal').textContent = T('leaflet'); };
+if (window.L) window.__leafletReady();
+load();
+</script>
+</body>
+</html>
