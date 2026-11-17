@@ -67,6 +67,12 @@ aside{border-right:1px solid var(--rule);background:var(--surface);display:flex;
 input[type=search],input[type=number],select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--rule);border-radius:4px;padding:6px 8px;width:100%;min-width:0}
 input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+/* bollini a torta: stessa resa nella mappa e nella legenda */
+.pie{background:none;border:0;cursor:pointer}
+.pie span{display:block;width:100%;height:100%;border-radius:50%;opacity:.88;box-shadow:0 0 0 1.5px var(--surface),0 1px 4px rgba(0,0,0,.35)}
+.pie.sel span{opacity:1;box-shadow:0 0 0 2px var(--surface),0 0 0 4.5px var(--sel),0 1px 4px rgba(0,0,0,.35)}
+.legend .dot{opacity:.88;box-shadow:0 0 0 1.5px var(--surface),0 0 0 2.5px var(--rule)}
+
 .years{display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:center;color:var(--muted)}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{position:relative;display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid var(--rule);border-radius:999px;padding:3px 10px 3px 7px;cursor:pointer;user-select:none;background:var(--paper);color:var(--ink)}
@@ -176,9 +182,8 @@ dl.label dd{margin:0;overflow-wrap:anywhere}
           <label for="q" data-i18n="search">Cerca</label>
           <input type="search" id="q" spellcheck="false" data-i18n-ph="searchPh" placeholder="Campagna, sito, tipo di campione…">
         </div>
-        <div class="field"><span class="lbl" data-i18n="area">Area</span><div class="chips" id="fArea"></div></div>
-        <div class="row2">
-          <div class="field"><label for="fCat" data-i18n="category">Categoria</label><select id="fCat"></select></div>
+        <div class="field"><span class="lbl" data-i18n="sType">Tipo di campione</span><div class="chips" id="fCat"></div></div>
+        <div>
           <div class="field"><span class="lbl" data-i18n="period">Periodo</span>
             <div class="years"><input type="number" id="y0" data-i18n-aria="from" aria-label="Dal" inputmode="numeric"><span>–</span><input type="number" id="y1" data-i18n-aria="to" aria-label="Al" inputmode="numeric"></div></div>
         </div>
@@ -233,10 +238,10 @@ const I18N = {
     campaigns:'campagne', campaign1:'campagna', samples:'campioni', sites:'siti',
     campList:'Campagne', noPos:'Campagne senza posizione sulla mappa', allSites:'\u2190 Tutte le campagne',
     noMatch:'Nessuna campagna corrisponde ai filtri. Prova ad allargare il periodo o ad azzerare i filtri.',
-    lgSize:'Area del cerchio \u221D numero di campioni', unknownArea:'Altra area',
+    lgSize:'Area del cerchio \u221D numero di campioni', lgPie:'Spicchi: campioni per tipo', sType:'Tipo di campione', unknownArea:'Altra area',
     availNames:{ ok:'Disponibile', ask:'Su richiesta', no:'Non disponibile', none:'Da definire' },
     nSamples:(n,u)=>`${n} campioni conservati`+(u!==n?` \u00B7 ${u} utilizzabili`:''),
-    composition:'Composizione', types:'Tipi di campione', fractions:'Frazioni granulometriche', where:'Siti di campionamento',
+    composition:'Composizione', types:'Supporti e formati', fractions:'Frazioni granulometriche', where:'Siti di campionamento',
     contact:'Referente', contacts:'Referenti', noContact:'Referente da definire', noMail:'email non indicata', write:'Scrivi al referente', writeAll:'Scrivi ai referenti', moreInfo:'Approfondisci',
     reqSubject:n=>`Aerarium \u2013 richiesta di informazioni sulla campagna \u201C${n}\u201D`,
     ids:'Identificativi', campId:'ID campagna', yearsLbl:'Periodo', pos:(i,n)=>`${i} / ${n}`, close:'Chiudi', prev:'Precedente', next:'Successivo',
@@ -249,10 +254,10 @@ const I18N = {
     campaigns:'campaigns', campaign1:'campaign', samples:'samples', sites:'sites',
     campList:'Campaigns', noPos:'Campaigns not shown on the map', allSites:'\u2190 All campaigns',
     noMatch:'No campaign matches the filters. Try widening the period or clearing the filters.',
-    lgSize:'Circle area \u221D number of samples', unknownArea:'Other area',
+    lgSize:'Circle area \u221D number of samples', lgPie:'Slices: samples by type', sType:'Sample type', unknownArea:'Other area',
     availNames:{ ok:'Available', ask:'On request', no:'Not available', none:'To be defined' },
     nSamples:(n,u)=>`${n} samples in storage`+(u!==n?` \u00B7 ${u} usable`:''),
-    composition:'Composition', types:'Sample types', fractions:'Size fractions', where:'Sampling sites',
+    composition:'Composition', types:'Media and formats', fractions:'Size fractions', where:'Sampling sites',
     contact:'Contact point', contacts:'Contact points', noContact:'Contact point to be defined', noMail:'email not given', write:'Write to the contact point', writeAll:'Write to the contact points', moreInfo:'More information',
     reqSubject:n=>`Aerarium \u2013 information request on the campaign \u201C${n}\u201D`,
     ids:'Identifiers', campId:'Campaign ID', yearsLbl:'Period', pos:(i,n)=>`${i} / ${n}`, close:'Close', prev:'Previous', next:'Next',
@@ -271,7 +276,7 @@ const tr = s => LANG === 'en' && EN_TERMS[s] ? EN_TERMS[s] : s;
    STATO E UTILIT\u00C0
    ===================================================================== */
 let DATA = null, CAMPS = [], BY_ID = {}, SITES = {}, AREAS = [], CATS = [], YMIN = 0, YMAX = 0, RESULTS = [];
-const S = { q:'', areaOff:new Set(), cat:'', availOff:new Set(), y0:null, y1:null, site:null, open:null };
+const S = { q:'', catOff:new Set(), availOff:new Set(), y0:null, y1:null, site:null, open:null };
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
@@ -280,6 +285,16 @@ const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).
 const areaVar = a => `var(${AREA_COLORS[norm(a)] || '--a-other'})`;
 const areaCss = a => css(AREA_COLORS[norm(a)] || '--a-other');
 const catVar = c => `var(${CAT_COLORS[norm(c)] || '--k-other'})`;
+/* bollino a torta: spicchi proporzionali ai campioni per tipo, area proporzionale al totale */
+function pieIcon(cats, n, sel){
+  const list = Object.entries(cats).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  const tot = list.reduce((a, [, v]) => a + v, 0) || 1; let acc = 0;
+  const stops = list.map(([k, v]) => { const a0 = acc / tot * 360; acc += v; return `${catVar(k)} ${a0.toFixed(2)}deg ${(acc / tot * 360).toFixed(2)}deg`; });
+  const d = Math.round(2 * (5 + Math.sqrt(n) * 2.2));
+  return L.divIcon({ className: 'pie' + (sel ? ' sel' : ''), html: `<span style="background:${stops.length ? `conic-gradient(${stops.join(',')})` : 'var(--k-other)'}"></span>`, iconSize: [d, d] });
+}
+const catLine = cats => Object.entries(cats).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${esc(typeof tr === 'function' ? tr(k) : k)} ${fmt(v)}`).join(' \u00B7 ');
+
 const availKey = a => { a = norm(a); return a.startsWith('disponib') ? 'ok' : a.startsWith('su richiesta') ? 'ask' : a.startsWith('non') ? 'no' : 'none'; };
 const availHtml = c => `<span class="av ${availKey(c.avail)}">${esc(T('availNames')[availKey(c.avail)])}</span>`;
 const period = c => c.y0 ? (c.y1 && c.y1 !== c.y0 ? `${c.y0}\u2013${c.y1}` : String(c.y0)) : '';
@@ -328,13 +343,14 @@ function init(d){
 function passes(c, skip){
   const q = norm(S.q).split(/\s+/).filter(Boolean);
   if (q.length && !q.every(t => c._h.includes(t))) return false;
-  if (skip !== 'area' && S.areaOff.has(c.area || '')) return false;
-  if (skip !== 'cat' && S.cat && !c.cats[S.cat]) return false;
+  if (skip !== 'cat' && S.catOff.size && !Object.keys(c.cats).some(k => !S.catOff.has(k))) return false;
   if (skip !== 'avail' && S.availOff.has(availKey(c.avail))) return false;
   if (skip !== 'year' && S.y0 != null && !(c.y0 && c.y0 <= S.y1 && (c.y1 || c.y0) >= S.y0)) return false;
   return true;
 }
-const filtersOn = () => !!(S.q || S.areaOff.size || S.cat || S.availOff.size || S.y0 != null);
+const filtersOn = () => !!(S.q || S.catOff.size || S.availOff.size || S.y0 != null);
+/* campioni della campagna per tipo, senza i tipi esclusi dai filtri */
+const visCats = c => Object.fromEntries(Object.entries(c.cats).filter(([k]) => !S.catOff.has(k)));
 
 /* =====================================================================
    RENDER
@@ -349,20 +365,17 @@ function renderCounts(){
   $('src').textContent = DATA.updated ? T('readAt') + ' ' + new Date(DATA.updated).toLocaleString(T('locale'), { day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
 }
 function renderFilters(){
-  const ac = {}; CAMPS.forEach(c => { if (passes(c, 'area')) ac[c.area || ''] = (ac[c.area || ''] || 0) + 1; });
-  $('fArea').innerHTML = AREAS.map(a => `<label class="chip"><input type="checkbox" data-area="${esc(a)}" ${S.areaOff.has(a) ? '' : 'checked'}><span class="dot" style="background:${areaVar(a)}"></span><span>${esc(a ? tr(a) : T('unknownArea'))}</span><span class="n">${ac[a] || 0}</span></label>`).join('');
+  const cc = {}; CAMPS.forEach(c => { if (passes(c, 'cat')) Object.entries(c.cats).forEach(([k, v]) => cc[k] = (cc[k] || 0) + v); });
+  $('fCat').innerHTML = CATS.map(k => `<label class="chip"><input type="checkbox" data-cat="${esc(k)}" ${S.catOff.has(k) ? '' : 'checked'}><span class="dot" style="background:${catVar(k)}"></span><span>${esc(tr(k))}</span><span class="n">${fmt(cc[k] || 0)}</span></label>`).join('');
   const vc = {}; CAMPS.forEach(c => { if (passes(c, 'avail')) vc[availKey(c.avail)] = (vc[availKey(c.avail)] || 0) + 1; });
   const keys = ['ok', 'ask', 'no', 'none'].filter(k => CAMPS.some(c => availKey(c.avail) === k));
   $('fAvail').innerHTML = keys.map(k => `<label class="chip"><input type="checkbox" data-avail="${k}" ${S.availOff.has(k) ? '' : 'checked'}><span class="dot" style="background:var(--${k === 'none' ? 'a-other' : k})"></span><span>${esc(T('availNames')[k])}</span><span class="n">${vc[k] || 0}</span></label>`).join('');
-  const cc = {}; CAMPS.forEach(c => { if (passes(c, 'cat')) Object.keys(c.cats).forEach(k => cc[k] = (cc[k] || 0) + 1); });
-  $('fCat').innerHTML = `<option value="">${esc(T('all_f'))}</option>` + CATS.map(k => `<option value="${esc(k)}">${esc(tr(k))} (${cc[k] || 0})</option>`).join('');
-  $('fCat').value = S.cat;
   $('y0').value = S.y0 != null ? S.y0 : ''; $('y1').value = S.y1 != null ? S.y1 : '';
 }
 function campRow(c){
   return `<button type="button" class="cp" data-open="${esc(c.id)}"${S.open === c.id ? ' aria-current="true"' : ''}>
     <span class="nm">${esc(c.name)}</span>
-    <span class="mt"><span class="ar"><span class="dot" style="background:${areaVar(c.area)}"></span>${esc(c.area ? tr(c.area) : T('unknownArea'))}</span>${period(c) ? `<span class="mono">${esc(period(c))}</span>` : ''}<span>${fmt(c.n)} ${T('samples')}</span>${availHtml(c)}</span>
+    <span class="mt"><span class="ar">${esc(c.area ? tr(c.area) : T('unknownArea'))}</span>${period(c) ? `<span class="mono">${esc(period(c))}</span>` : ''}<span>${fmt(c.n)} ${T('samples')}</span>${availHtml(c)}</span>
   </button>`;
 }
 function renderPanel(){
@@ -388,16 +401,16 @@ const coord = s => `${Math.abs(s.lat).toFixed(3)}\u00B0 ${s.lat >= 0 ? 'N' : 'S'
 let map = null, layer = null;
 function setupMap(){
   if (!window.L) return;
-  map = L.map('map', { minZoom: 2, maxZoom: 18, worldCopyJump: true, preferCanvas: true });
+  map = L.map('map', { minZoom: 0, maxZoom: 18, zoomSnap: .25, zoomDelta: .5, worldCopyJump: true, preferCanvas: true });
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>' }).addTo(map);
   map.attributionControl.setPrefix(false);
-  map.setView([30, 10], 2);
+  map.setView([10, 60], 1);
   layer = L.layerGroup().addTo(map);
 }
 function siteGroups(){
   const g = new Map();
-  RESULTS.forEach(c => c.sites.forEach(id => { let e = g.get(id); if (!e) { e = { site: SITES[id], camps: [], n: 0 }; g.set(id, e); } e.camps.push(c); e.n += c.n; }));
-  return [...g.values()].sort((a, b) => b.n - a.n);
+  RESULTS.forEach(c => { const vc = visCats(c); c.sites.forEach(id => { let e = g.get(id); if (!e) { e = { site: SITES[id], camps: [], n: 0, cats: {} }; g.set(id, e); } e.camps.push(c); Object.entries(vc).forEach(([k, v]) => { e.cats[k] = (e.cats[k] || 0) + v; e.n += v; }); }); });
+  return [...g.values()].filter(e => e.n > 0).sort((a, b) => b.n - a.n);
 }
 function drawMap(fit){
   renderLegend();
@@ -405,12 +418,9 @@ function drawMap(fit){
   layer.clearLayers();
   const groups = siteGroups();
   groups.forEach(e => {
-    const areas = {}; e.camps.forEach(c => areas[c.area] = (areas[c.area] || 0) + c.n);
-    const area = e.site.area || Object.keys(areas).sort((a, b) => areas[b] - areas[a])[0];
-    const sel = S.site === e.site.id;
-    const m = L.circleMarker([e.site.lat, e.site.lon], { radius: 5 + Math.sqrt(e.n) * 2.2, color: sel ? css('--sel') : areaCss(area), weight: sel ? 3 : 1.5,
-      fillColor: areaCss(area), fillOpacity: sel ? .8 : .5, bubblingMouseEvents: false });
-    m.bindTooltip(`<b>${esc(e.site.name)}</b><br>${e.camps.length} ${e.camps.length === 1 ? T('campaign1') : T('campaigns')} \u00B7 ${fmt(e.n)} ${T('samples')}`, { className: 'tt', direction: 'top', offset: [0, -4] });
+    const sel = S.site === e.site.id, icon = pieIcon(e.cats, e.n, sel);
+    const m = L.marker([e.site.lat, e.site.lon], { icon, keyboard: false, riseOnHover: true, zIndexOffset: sel ? 2000 : 1000 - icon.options.iconSize[0] * 10, bubblingMouseEvents: false });
+    m.bindTooltip(`<b>${esc(e.site.name)}</b><br>${e.camps.length} ${e.camps.length === 1 ? T('campaign1') : T('campaigns')} \u00B7 ${fmt(e.n)} ${T('samples')}<br>${catLine(e.cats)}`, { className: 'tt', direction: 'top', offset: [0, -icon.options.iconSize[0] / 2] });
     m.on('click', () => selectSite(e.site.id));
     m.addTo(layer);
   });
@@ -419,7 +429,8 @@ function drawMap(fit){
 function fitAll(groups){
   groups = groups || siteGroups();
   if (!map || !groups.length) return;
-  map.fitBounds(L.latLngBounds(groups.map(e => [e.site.lat, e.site.lon])).pad(.15), { maxZoom: 6 });
+  map.invalidateSize();
+  map.fitBounds(L.latLngBounds(groups.map(e => [e.site.lat, e.site.lon])), { padding: [40, 40], maxZoom: 6 });
 }
 function selectSite(id){
   S.site = id;
@@ -430,8 +441,9 @@ function selectSite(id){
   $('panel').scrollTop = 0;
 }
 function renderLegend(){
-  const used = [...new Set(RESULTS.filter(c => c.sites.length).map(c => c.area || ''))];
-  $('legend').innerHTML = used.map(a => `<div class="i"><span class="dot" style="background:${areaVar(a)}"></span>${esc(a ? tr(a) : T('unknownArea'))}</div>`).join('') + `<div class="s">${esc(T('lgSize'))}</div>`;
+  const cc = {}; siteGroups().forEach(e => Object.entries(e.cats).forEach(([k, v]) => cc[k] = (cc[k] || 0) + v));
+  const used = Object.keys(cc).sort((a, b) => cc[b] - cc[a]);
+  $('legend').innerHTML = used.map(k => `<div class="i"><span class="dot" style="background:${catVar(k)}"></span>${esc(tr(k))}</div>`).join('') + `<div class="s">${esc(T('lgPie'))}<br>${esc(T('lgSize'))}</div>`;
   $('legend').hidden = !used.length;
 }
 
@@ -459,7 +471,7 @@ function openCamp(id, silent){
   const link = /^https?:\/\//.test(c.link || '') ? c.link : '';
   $('dBody').innerHTML = `
     <div>
-      <div class="dkick"><span class="ar"><span class="dot" style="background:${areaVar(c.area)}"></span>${esc(c.area ? tr(c.area) : T('unknownArea'))}</span>${period(c) ? `<span class="box">${esc(period(c))}</span>` : ''}${availHtml(c)}</div>
+      <div class="dkick"><span class="ar">${esc(c.area ? tr(c.area) : T('unknownArea'))}</span>${period(c) ? `<span class="box">${esc(period(c))}</span>` : ''}${availHtml(c)}</div>
       <h2 id="dTitle">${esc(c.name)}</h2>
       <p class="note" style="margin:6px 0 0">${esc(T('nSamples', c.n, c.nUsable))}</p>
     </div>
@@ -520,8 +532,7 @@ function refresh(){ S.site = S.site && RESULTS.some(c => c.sites.includes(S.site
 let qT;
 $('filters').addEventListener('submit', e => e.preventDefault());
 $('q').addEventListener('input', e => { clearTimeout(qT); qT = setTimeout(() => { S.q = e.target.value.trim(); S.site = null; render(false); }, 160); });
-$('fCat').addEventListener('change', e => { S.cat = e.target.value; refresh(); });
-$('fArea').addEventListener('change', e => { const a = e.target.dataset.area; if (a == null) return; e.target.checked ? S.areaOff.delete(a) : S.areaOff.add(a); refresh(); });
+$('fCat').addEventListener('change', e => { const k = e.target.dataset.cat; if (k == null) return; e.target.checked ? S.catOff.delete(k) : S.catOff.add(k); refresh(); });
 $('fAvail').addEventListener('change', e => { const a = e.target.dataset.avail; if (!a) return; e.target.checked ? S.availOff.delete(a) : S.availOff.add(a); refresh(); });
 const years = () => {
   let a = parseInt($('y0').value, 10), b = parseInt($('y1').value, 10);
@@ -530,7 +541,7 @@ const years = () => {
   refresh();
 };
 $('y0').addEventListener('change', years); $('y1').addEventListener('change', years);
-$('reset').onclick = () => { S.q = ''; $('q').value = ''; S.areaOff.clear(); S.availOff.clear(); S.cat = ''; S.y0 = S.y1 = null; S.site = null; render(true); };
+$('reset').onclick = () => { S.q = ''; $('q').value = ''; S.catOff.clear(); S.availOff.clear(); S.y0 = S.y1 = null; S.site = null; render(true); };
 $('fitAll').onclick = () => { S.site = null; render(true); };
 $('dClose').onclick = closeCamp; $('scrim').onclick = closeCamp;
 $('dPrev').onclick = () => step(-1); $('dNext').onclick = () => step(1);
